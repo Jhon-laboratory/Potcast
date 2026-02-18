@@ -29,7 +29,7 @@ $usuario_cd = $_SESSION['cd'] ?? '';
 $usuario_cdtxt = $_SESSION['cdtxt'] ?? '';
 
 // Definir qué usuarios pueden subir contenido (SOLO 131 y 29)
-$usuarios_con_permiso_subida = [131]; // Array con los IDs permitidos
+$usuarios_con_permiso_subida = [131,29]; // Array con los IDs permitidos
 $puede_subir = in_array($usuario_id, $usuarios_con_permiso_subida);
 
 // ===== CONFIGURACIÓN =====
