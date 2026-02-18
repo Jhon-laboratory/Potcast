@@ -15,13 +15,22 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 // ==============================================
 
-// Verificar sesión (comentado para pruebas)
-/*
-if (!isset($_SESSION['usuario']) || !isset($_SESSION['usuario_id'])) {
-    header("Location: login.php");
+// Verificar sesión activa desde login.php - REDIRECCIÓN A TU URL ESPECÍFICA
+if (!isset($_SESSION['id_user'])) {
+    header("Location: https://ransa-seguro.com/login/");
     exit;
 }
-*/
+
+// Obtener datos del usuario de la sesión (desde login.php)
+$usuario_id = $_SESSION['id_user']; // ID del usuario
+$usuario_nombre = $_SESSION['nombre'] ?? 'Usuario';
+$usuario_email = $_SESSION['correo'] ?? '';
+$usuario_cd = $_SESSION['cd'] ?? '';
+$usuario_cdtxt = $_SESSION['cdtxt'] ?? '';
+
+// Definir qué usuarios pueden subir contenido (SOLO 131 y 29)
+$usuarios_con_permiso_subida = [131, 29]; // Array con los IDs permitidos
+$puede_subir = in_array($usuario_id, $usuarios_con_permiso_subida);
 
 // ===== CONFIGURACIÓN =====
 define('DB_HOST', 'Jorgeserver.database.windows.net');
@@ -289,9 +298,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 // Obtener todos los medios
 $all_media = getAllMedia();
 $total_archivos = count($all_media);
-
-$sede_usuario = isset($_SESSION['tienda']) ? limpiarString($_SESSION['tienda']) : '';
-$usuario = isset($_SESSION['usuario']) ? limpiarString($_SESSION['usuario']) : 'Usuario';
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -872,8 +878,11 @@ $usuario = isset($_SESSION['usuario']) ? limpiarString($_SESSION['usuario']) : '
                     <div class="profile clearfix">
                         <div class="profile_info">
                             <span>Bienvenido,</span>
-                            <h2><?php echo htmlspecialchars($usuario); ?></h2>
-                            <span><?php echo htmlspecialchars($_SESSION['correo'] ?? ''); ?></span>
+                            <h2><?php echo htmlspecialchars($usuario_nombre); ?></h2>
+                            <span><?php echo htmlspecialchars($usuario_email); ?></span>
+                            <?php if (!empty($usuario_cdtxt)): ?>
+                                <span><i class="fa fa-map-marker"></i> <?php echo htmlspecialchars($usuario_cdtxt); ?></span>
+                            <?php endif; ?>
                         </div>
                     </div>
 
@@ -915,13 +924,16 @@ $usuario = isset($_SESSION['usuario']) ? limpiarString($_SESSION['usuario']) : '
                     <div class="nav navbar-nav navbar-right">
                         <span style="color: white; padding: 15px; font-weight: 600;">
                             <i class="fa fa-user-circle"></i> 
-                            <?php echo htmlspecialchars($usuario); ?>
-                            <?php if (!empty($sede_usuario)): ?>
+                            <?php echo htmlspecialchars($usuario_nombre); ?>
+                            <?php if (!empty($usuario_cdtxt)): ?>
                                 <small style="opacity: 0.8; margin-left: 10px;">
                                     <i class="fa fa-map-marker"></i> 
-                                    <?php echo htmlspecialchars($sede_usuario); ?>
+                                    <?php echo htmlspecialchars($usuario_cdtxt); ?>
                                 </small>
                             <?php endif; ?>
+                            <small style="opacity: 0.6; margin-left: 10px; font-size: 11px;">
+                                (ID: <?php echo $usuario_id; ?>)
+                            </small>
                         </span>
                     </div>
                 </div>
@@ -945,9 +957,13 @@ $usuario = isset($_SESSION['usuario']) ? limpiarString($_SESSION['usuario']) : '
                                             <input type="text" id="searchInput" class="form-control" 
                                                    placeholder="Buscar por título, descripción o tipo...">
                                         </div>
-                                        <button class="btn-upload" data-toggle="modal" data-target="#uploadModal">
-                                            <i class="fa fa-plus"></i> Agregar Contenido
-                                        </button>
+                                        
+                                        <!-- Mostrar botón SOLO para usuarios autorizados (ID 131 y 29) -->
+                                        <?php if ($puede_subir): ?>
+                                            <button class="btn-upload" data-toggle="modal" data-target="#uploadModal">
+                                                <i class="fa fa-plus"></i> Agregar Contenido
+                                            </button>
+                                        <?php endif; ?>
                                     </div>
                                 </div>
 
@@ -958,16 +974,20 @@ $usuario = isset($_SESSION['usuario']) ? limpiarString($_SESSION['usuario']) : '
                                             <i class="fa fa-film"></i>
                                             <h3>No hay contenido multimedia</h3>
                                             <p>Comienza subiendo tu primer video o audio</p>
-                                            <button class="btn-upload" data-toggle="modal" data-target="#uploadModal">
-                                                <i class="fa fa-plus"></i> Agregar Contenido
-                                            </button>
+                                            
+                                            <!-- Mostrar botón SOLO para usuarios autorizados (ID 131 y 29) -->
+                                            <?php if ($puede_subir): ?>
+                                                <button class="btn-upload" data-toggle="modal" data-target="#uploadModal">
+                                                    <i class="fa fa-plus"></i> Agregar Contenido
+                                                </button>
+                                            <?php endif; ?>
                                         </div>
                                     <?php else: ?>
                                         <div class="media-grid" id="mediaGrid">
                                             <?php foreach ($all_media as $media): ?>
                                                 <!-- Tarjeta con debug -->
                                                 <div class="media-card" 
-                                                     onclick="debugReproduccion('<?php echo $media['guid']; ?>', '<?php echo $media['tipo']; ?>', '<?php echo $media['titulo']; ?>')" 
+                                                     onclick="debugReproduccion('<?php echo $media['guid']; ?>', '<?php echo $media['tipo']; ?>', '<?php echo htmlspecialchars($media['titulo']); ?>')" 
                                                      data-guid="<?php echo $media['guid']; ?>"
                                                      data-tipo="<?php echo $media['tipo']; ?>"
                                                      data-titulo="<?php echo htmlspecialchars($media['titulo']); ?>">
@@ -1046,7 +1066,8 @@ $usuario = isset($_SESSION['usuario']) ? limpiarString($_SESSION['usuario']) : '
         </div>
     </div>
 
-    <!-- MODAL SUBIR ARCHIVO -->
+    <!-- MODAL SUBIR ARCHIVO - Solo visible para usuarios autorizados -->
+    <?php if ($puede_subir): ?>
     <div class="modal fade" id="uploadModal" tabindex="-1" role="dialog" data-backdrop="static">
         <div class="modal-dialog modal-md" role="document">
             <div class="modal-content">
@@ -1144,6 +1165,7 @@ $usuario = isset($_SESSION['usuario']) ? limpiarString($_SESSION['usuario']) : '
             </div>
         </div>
     </div>
+    <?php endif; ?>
 
     <!-- MODAL REPRODUCTOR -->
     <div class="modal fade" id="playerModal" tabindex="-1" role="dialog" data-backdrop="static">
@@ -1207,11 +1229,16 @@ $usuario = isset($_SESSION['usuario']) ? limpiarString($_SESSION['usuario']) : '
     // =============================================
     $(document).ready(function() {
         configurarEventos();
+        
+        <?php if ($puede_subir): ?>
         inicializarFileUpload();
+        <?php endif; ?>
         
         // Mostrar información de depuración en consola al cargar la página
         console.log('========== INFO DE CARGA ==========');
         console.log('Total medios cargados:', mediaFiles.length);
+        console.log('ID Usuario actual:', <?php echo $usuario_id; ?>);
+        console.log('¿Puede subir contenido?', <?php echo $puede_subir ? 'true' : 'false'; ?>);
         if (mediaFiles.length > 0) {
             console.log('Primer medio:', mediaFiles[0]);
             console.log('Ejemplo de GUID:', mediaFiles[0]?.guid);
@@ -1250,11 +1277,14 @@ $usuario = isset($_SESSION['usuario']) ? limpiarString($_SESSION['usuario']) : '
 
         // Atajos de teclado
         $(document).on('keydown', function(e) {
-            // Ctrl + F2 para abrir upload
+            // Ctrl + F2 para abrir upload (solo si tiene permiso)
+            <?php if ($puede_subir): ?>
             if (e.ctrlKey && e.key === 'F2') {
                 e.preventDefault();
                 $('#uploadModal').modal('show');
             }
+            <?php endif; ?>
+            
             // Escape para cerrar modales
             if (e.key === 'Escape') {
                 $('#uploadModal').modal('hide');
@@ -1263,6 +1293,7 @@ $usuario = isset($_SESSION['usuario']) ? limpiarString($_SESSION['usuario']) : '
         });
     }
 
+    <?php if ($puede_subir): ?>
     function inicializarFileUpload() {
         const uploadArea = document.getElementById('uploadArea');
         const fileInput = document.getElementById('mediaFile');
@@ -1445,6 +1476,7 @@ $usuario = isset($_SESSION['usuario']) ? limpiarString($_SESSION['usuario']) : '
             btn.prop('disabled', false).html(textoOriginal);
         });
     }
+    <?php endif; ?>
 
     // =============================================
     // FUNCIÓN DE DEBUG
@@ -1695,7 +1727,14 @@ $usuario = isset($_SESSION['usuario']) ? limpiarString($_SESSION['usuario']) : '
 
     function cerrarSesion() {
         if (confirm('¿Está seguro de que desea cerrar sesión?')) {
-            window.location.href = 'logout.php';
+            // Primero intenta cerrar sesión localmente
+            fetch('logout.php', {
+                method: 'POST',
+                credentials: 'same-origin'
+            }).finally(() => {
+                // Redirige al login corporativo
+                window.location.href = 'https://ransa-seguro.com/login/';
+            });
         }
     }
     </script>
